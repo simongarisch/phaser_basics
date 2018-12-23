@@ -4,13 +4,20 @@ var gameOptions = {
  tileSize: 200,
  tileSpacing: 20,
  boardSize: {
- rows: 4,
- cols: 4
- }
+   rows: 4,
+   cols: 4},
+ tweenSpeed: 200,
+ swipeMaxTime: 1000,
+ swipeMinDistance: 20,
+ swipeMinNormal: 0.85
 }
 
-window.onload = function(){
+const LEFT = 0;
+const RIGHT = 1;
+const UP = 2;
+const DOWN = 3;
 
+window.onload = function(){
  var gameConfig = {
    width: gameOptions.boardSize.cols * (gameOptions.tileSize +
           gameOptions.tileSpacing) + gameOptions.tileSpacing,
@@ -71,6 +78,10 @@ class playGame extends Phaser.Scene{
 
   create(){
     //console.log("this is my awesome game");
+    this.canMove = false;
+    this.input.keyboard.on("keydown", this.handleKey, this);
+    this.input.on("pointerup", this.handleSwipe, this);
+
     this.boardArray = [];
     for(var i = 0; i < 4; i++){
       this.boardArray[i] = [];
@@ -98,11 +109,23 @@ class playGame extends Phaser.Scene{
         }
       }
     }
-   if(emptyTiles.length > 0){
-   var chosenTile = Phaser.Utils.Array.GetRandom(emptyTiles);
-   this.boardArray[chosenTile.row][chosenTile.col].tileValue = 1;
-   this.boardArray[chosenTile.row][chosenTile.col].tileSprite.visible = true;
-   this.boardArray[chosenTile.row][chosenTile.col].tileSprite.setFrame(0);
+
+    if(emptyTiles.length > 0){
+      var chosenTile = Phaser.Utils.Array.GetRandom(emptyTiles);
+      this.boardArray[chosenTile.row][chosenTile.col].tileValue = 1;
+      this.boardArray[chosenTile.row][chosenTile.col].tileSprite.visible = true;
+      this.boardArray[chosenTile.row][chosenTile.col].tileSprite.setFrame(0);
+      this.boardArray[chosenTile.row][chosenTile.col].tileSprite.alpha = 0;
+      this.tweens.add({
+        targets: [this.boardArray[chosenTile.row][chosenTile.col].tileSprite],
+        alpha: 1,
+        duration: gameOptions.tweenSpeed,
+        callbackScope: this,
+        onComplete: function(){
+          console.log("tween completed");
+          this.canMove = true;
+        }
+      });
    }
   }
 
@@ -110,6 +133,78 @@ class playGame extends Phaser.Scene{
     var posX = gameOptions.tileSpacing * (col + 1) + gameOptions.tileSize * (col + 0.5);
     var posY = gameOptions.tileSpacing * (row + 1) + gameOptions.tileSize * (row + 0.5);
     return new Phaser.Geom.Point(posX, posY);
+  }
+
+  handleKey(e){
+    //var keyPressed = e.code
+    //console.log("You pressed key #" + keyPressed);
+    if(this.canMove){
+      switch(e.code){
+        case "KeyA":
+        case "ArrowLeft":
+          this.makeMove(LEFT);
+          break;
+        case "KeyD":
+        case "ArrowRight":
+          this.makeMove(RIGHT);
+          break;
+        case "KeyW":
+        case "ArrowUp":
+          this.makeMove(UP);
+          break;
+        case "KeyS":
+        case "ArrowDown":
+          this.makeMove(DOWN);
+          break;
+      }
+    }
+  }
+
+  makeMove(d){
+    console.log("about to move");
+  }
+
+  handleSwipe(e){
+    if(this.canMove){
+      var swipeTime = e.upTime - e.downTime;
+      var fastEnough = swipeTime < gameOptions.swipeMaxTime;
+      var swipe = new Phaser.Geom.Point(e.upX - e.downX, e.upY - e.downY);
+      var swipeMagnitude = Phaser.Geom.Point.GetMagnitude(swipe);
+      var longEnough = swipeMagnitude > gameOptions.swipeMinDistance;
+      if(longEnough && fastEnough){
+        Phaser.Geom.Point.SetMagnitude(swipe, 1);
+        if(swipe.x > gameOptions.swipeMinNormal){
+          this.makeMove(RIGHT);
+        }
+        if(swipe.x < -gameOptions.swipeMinNormal){
+          this.makeMove(LEFT);
+        }
+        if(swipe.y > gameOptions.swipeMinNormal){
+          this.makeMove(DOWN);
+        }
+        if(swipe.y < -gameOptions.swipeMinNormal){
+          this.makeMove(UP);
+        }
+      }
+    }
+  }
+
+  makeMove(d){
+    var dRow = (d == LEFT || d == RIGHT) ? 0 : d == UP ? -1 : 1;
+    var dCol = (d == UP || d == DOWN) ? 0 : d == LEFT ? -1 : 1;
+    this.canMove = false;
+    for(var i = 0; i < gameOptions.boardSize.rows; i++){
+      for(var j = 0; j < gameOptions.boardSize.cols; j++){
+        var curRow = dRow == 1 ? (gameOptions.boardSize.rows - 1) - i : i;
+        var curCol = dCol == 1 ? (gameOptions.boardSize.cols - 1) - j : j;
+        var tileValue = this.boardArray[curRow][curCol].tileValue;
+        if(tileValue != 0){
+          var newPos = this.getTilePosition(curRow + dRow, curCol + dCol);
+          this.boardArray[curRow][curCol].tileSprite.x = newPos.x;
+          this.boardArray[curRow][curCol].tileSprite.y = newPos.y;
+        }
+      }
+    }
   }
 
 }
